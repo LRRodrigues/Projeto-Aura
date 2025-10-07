@@ -1,0 +1,82 @@
+version: '3.8'
+
+services:
+  # --- Backend Services ---
+  api-gateway:
+    build:
+      context: ./backend/api-gateway
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/api-gateway/app:/app
+    environment:
+      - PYTHONUNBUFFERED=1
+    networks:
+      - aura-net
+
+  scribe-logs:
+    build:
+      context: ./backend/scribe-logs
+    volumes:
+      - ./backend/scribe-logs/app:/app
+    environment:
+      - PYTHONUNBUFFERED=1
+    networks:
+      - aura-net
+    depends_on:
+      - rabbitmq
+
+  sentinel-network:
+    build:
+      context: ./backend/sentinel-network
+    networks:
+      - aura-net
+
+  # --- Frontend Service ---
+  aura-prism-dashboard:
+    build:
+      context: ./frontend/aura-prism-dashboard
+      dockerfile: Dockerfile
+    ports:
+      - "3000:80"
+    networks:
+      - aura-net
+    depends_on:
+      - api-gateway
+
+  # --- Infrastructure Services ---
+  postgres:
+    image: postgres:14-alpine
+    environment:
+      - POSTGRES_USER=aura
+      - POSTGRES_PASSWORD=supersecret
+      - POSTGRES_DB=auradb
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - aura-net
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - aura-net
+
+  rabbitmq:
+    image: rabbitmq:3.9-management-alpine
+    ports:
+      - "5672:5672"  # AMQP
+      - "15672:15672" # Management UI
+    networks:
+      - aura-net
+
+# --- Volumes & Networks ---
+volumes:
+  postgres_data:
+
+networks:
+  aura-net:
+    driver: bridge
